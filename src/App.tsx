@@ -6,7 +6,7 @@ interface Pin {
 }
 
 const UNSPLASH_API_URL = "https://api.unsplash.com/photos";
-const ACCESS_KEY = "ys1SFt7_sgvbGAQWDRrNOCjLNFb3nUKte1EJ7ksffks";
+const ACCESS_KEY = "X77SlxGwnEyMPV_fYxtHzCEzydelQ1D_q95ux7z6wuE";
 
 const fetchPins = async (page: number, perPage: number = 10): Promise<Pin[]> => {
   const response = await fetch(
