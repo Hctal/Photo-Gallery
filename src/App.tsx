@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import throttle from "lodash.throttle";
 
 interface Pin {
   id: string;
@@ -34,6 +35,7 @@ export default function App() {
   const [page, setPage] = useState(1);
   const [viewFavorites, setViewFavorites] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem("favorites");
@@ -54,18 +56,19 @@ export default function App() {
   };
 
   const loadMorePins = async () => {
-    if (loading || viewFavorites) return;
+    if (loading || viewFavorites || !hasMore) return;
     setLoading(true);
     try {
       const newPins = await fetchPins(page, 10, searchTerm);
-      if (Array.isArray(newPins)) {
+      if (Array.isArray(newPins) && newPins.length > 0) {
         setPins((prev) => [
           ...prev,
           ...newPins.filter((pin) => !prev.some((p) => p.id === pin.id)),
         ]);
         setPage((prevPage) => prevPage + 1);
+        setHasMore(true);
       } else {
-        console.error("fetchPins returned non-array data:", newPins);
+        setHasMore(false); // Stop fetching if no more results
       }
     } catch (error) {
       console.error("Error fetching pins:", error);
@@ -81,6 +84,7 @@ export default function App() {
       const newPins = await fetchPins(1, 10, searchTerm);
       setPins(newPins);
       setPage(2);
+      setHasMore(true);
     } catch (error) {
       console.error("Search failed", error);
     } finally {
@@ -89,21 +93,21 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 300 &&
-        !loading &&
-        !viewFavorites
-      ) {
+    if (!viewFavorites && pins.length === 0) {
+      loadMorePins();
+    }
+
+    const throttledScroll = throttle(() => {
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 300;
+      if (scrollPosition >= threshold && !loading && !viewFavorites) {
         loadMorePins();
       }
-    };
+    }, 300);
 
-    window.addEventListener("scroll", onScroll);
-    loadMorePins();
-
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [loading, viewFavorites, searchTerm]);
+    window.addEventListener("scroll", throttledScroll);
+    return () => window.removeEventListener("scroll", throttledScroll);
+  }, [loading, viewFavorites, searchTerm, pins]);
 
   const displayedPins = viewFavorites ? favorites : pins;
 
@@ -147,13 +151,9 @@ export default function App() {
                 alt={pin.alt_description || "pin"}
                 className="w-full object-cover transition-opacity duration-300 hover:opacity-90"
               />
-
-              {/* Description */}
               <div className="p-2 text-sm text-gray-700 line-clamp-2">
                 {pin.description || pin.alt_description || "No description available"}
               </div>
-
-              {/* Fav Button */}
               <button
                 onClick={() =>
                   isFav ? removeFromFavorites(pin.id) : saveToFavorites(pin)
@@ -169,6 +169,9 @@ export default function App() {
 
       {loading && (
         <p className="text-center mt-4 text-gray-600">Loading more pins...</p>
+      )}
+      {!hasMore && (
+        <p className="text-center mt-4 text-gray-500">🎉 You've reached the end!</p>
       )}
     </div>
   );
